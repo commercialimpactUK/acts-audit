@@ -486,6 +486,8 @@
     .logo-img { height: 38px; }
   }
 </style>
+<!-- Cookieless visit counter - no consent banner needed -->
+<script data-goatcounter="https://commercialimpact.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
 </head>
 <body>
 
@@ -563,6 +565,7 @@
     </div>
     <div class="field-group">
       <div class="field"><label>Work email <span class="req">*</span></label><input type="email" id="email" placeholder="sarah@acmepetfoods.com" required></div>
+      <div aria-hidden="true" style="position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden;"><label for="website">Leave this empty</label><input type="text" id="website" name="website" tabindex="-1" autocomplete="off"></div>
       <div class="field"><label>Company size</label>
         <select id="companySize">
           <option value="" disabled selected>Select...</option>
@@ -729,7 +732,13 @@
   const scores = {};
   const TOTAL = 40;
 
+  let auditStarted = false;
+  function trackEvent(name) {
+    try { if (window.goatcounter && window.goatcounter.count) window.goatcounter.count({ path: name, title: name, event: true }); } catch (e) {}
+  }
+
   function selectScore(qNum, score, el) {
+    if (!auditStarted) { auditStarted = true; trackEvent('audit-started'); }
     const siblings = el.parentElement.querySelectorAll('.scale-btn');
     siblings.forEach(b => b.classList.remove('selected-1','selected-2','selected-3','selected-4','selected-5'));
     el.classList.add('selected-' + score);
@@ -792,13 +801,18 @@
       consent1: document.getElementById('consent1').checked,
       consent2: document.getElementById('consent2').checked,
       consent3: document.getElementById('consent3').checked,
-      scores: scores
+      scores: scores,
+      website: document.getElementById('website').value
     };
     const submitBtn = document.querySelector('.submit-btn');
     const originalText = submitBtn.textContent;
     submitBtn.textContent = 'Sending…'; submitBtn.disabled = true; submitBtn.style.opacity = '0.7';
     try {
-      await fetch(WEBAPP_URL, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(formData) });
+      // text/plain avoids a CORS preflight, so the script's reply can be read
+      const res = await fetch(WEBAPP_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(formData) });
+      const reply = await res.json();
+      if (reply.result !== 'success') throw new Error(reply.error || 'Submission not confirmed');
+      trackEvent('audit-submitted');
       document.querySelector('.submit-section').innerHTML = `
         <div style="background:rgba(46,125,94,0.08);border:2px solid rgba(46,125,94,0.3);
                     border-radius:12px;padding:48px 36px;text-align:center;">
